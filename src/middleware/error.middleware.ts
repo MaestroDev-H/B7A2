@@ -1,8 +1,14 @@
 import type { Request, Response, NextFunction } from 'express';
 import { StatusCodes } from 'http-status-codes';
 
+
+interface AppError extends Error {
+  statusCode?: number;
+  errors?: unknown[] | null;
+}
+
 export const globalErrorHandler = (
-  err: any,
+  err: AppError, 
   req: Request,
   res: Response,
   next: NextFunction

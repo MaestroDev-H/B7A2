@@ -18,8 +18,7 @@ export const protect = async (req: AuthenticatedRequest, res: Response, next: Ne
       });
     }
 
-    // Spec uses bare token: Authorization: <token>
-    // Also supporting "Bearer <token>" for compatibility
+  
     const token = authHeader.startsWith('Bearer ') ? authHeader.split(' ')[1] : authHeader;
 
     if (!token) {
