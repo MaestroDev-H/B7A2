@@ -37,16 +37,16 @@ export const getAllIssues = async (req: AuthenticatedRequest, res: Response, nex
     const { sort, type, status } = req.query;
 
     let queryText = 'SELECT * FROM issues';
-    const queryParams: any[] = [];
+    const queryParams: (string | number)[] = [];
     const whereClauses: string[] = [];
 
     if (type) {
-      queryParams.push(type);
+      queryParams.push(String(type));
       whereClauses.push(`type = $${queryParams.length}`);
     }
 
     if (status) {
-      queryParams.push(status);
+      queryParams.push(String(status));
       whereClauses.push(`status = $${queryParams.length}`);
     }
 

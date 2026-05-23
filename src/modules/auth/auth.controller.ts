@@ -19,19 +19,26 @@ export const signup = async (req: Request, res: Response, next: NextFunction) =>
     // Check if user exists
     const userExist = await pool.query('SELECT * FROM users WHERE email = $1', [email]);
     if (userExist.rows.length > 0) {
-      return res.status(StatusCodes.BAD_REQUEST).json({
-        success: false,
-        message: 'User already exists with this email',
-      });
+     return res.status(StatusCodes.CONFLICT).json({
+  success: false,
+  message: 'User already exists with this email',
+});
     }
 
     // Hash password
     const hashedPassword = await bcrypt.hash(password, 10);
-    const userRole = role || 'contributor';
+   const allowedRoles = ['contributor', 'maintainer'];
+
+if (role && !allowedRoles.includes(role)) {
+  return res.status(StatusCodes.BAD_REQUEST).json({
+    success: false,
+    message: 'Invalid role',
+  });
+}
 
     const result = await pool.query(
       'INSERT INTO users (name, email, password, role) VALUES ($1, $2, $3, $4) RETURNING id, name, email, role, created_at, updated_at',
-      [name, email, hashedPassword, userRole]
+      [name, email, hashedPassword, role]
     );
 
     sendResponse(res, StatusCodes.CREATED, true, 'User registered successfully', result.rows[0]);
