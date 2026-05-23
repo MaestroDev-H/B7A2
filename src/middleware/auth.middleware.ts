@@ -3,7 +3,6 @@ import jwt from 'jsonwebtoken';
 import { StatusCodes } from 'http-status-codes';
 import type { JwtPayload } from '../modules/auth/auth.interface.js';
 
-
 export interface AuthenticatedRequest extends Request {
   user?: JwtPayload;
 }
@@ -11,6 +10,7 @@ export interface AuthenticatedRequest extends Request {
 export const protect = async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
   try {
     const authHeader = req.headers.authorization;
+
     if (!authHeader) {
       return res.status(StatusCodes.UNAUTHORIZED).json({
         success: false,
@@ -18,7 +18,8 @@ export const protect = async (req: AuthenticatedRequest, res: Response, next: Ne
       });
     }
 
-   
+    // Spec uses bare token: Authorization: <token>
+    // Also supporting "Bearer <token>" for compatibility
     const token = authHeader.startsWith('Bearer ') ? authHeader.split(' ')[1] : authHeader;
 
     if (!token) {
@@ -28,9 +29,11 @@ export const protect = async (req: AuthenticatedRequest, res: Response, next: Ne
       });
     }
 
-    
-    const decoded = jwt.verify(token, process.env.JWT_SECRET || 'fallback_secret_key') as unknown as JwtPayload;
-    
+    const decoded = jwt.verify(
+      token,
+      process.env.JWT_SECRET || 'fallback_secret_key'
+    ) as unknown as JwtPayload;
+
     req.user = decoded;
     next();
   } catch (error) {

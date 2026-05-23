@@ -1,9 +1,13 @@
 import type { Request, Response, NextFunction } from 'express';
+import type { SignOptions } from 'jsonwebtoken';
 import bcrypt from 'bcrypt';
 import jwt from 'jsonwebtoken';
 import { StatusCodes } from 'http-status-codes';
 import { pool } from '../../config/db.js';
 import { sendResponse } from '../../utils/response.js';
+
+const VALID_ROLES = ['contributor', 'maintainer'] as const;
+type UserRole = typeof VALID_ROLES[number];
 
 export const signup = async (req: Request, res: Response, next: NextFunction) => {
   try {
@@ -16,29 +20,30 @@ export const signup = async (req: Request, res: Response, next: NextFunction) =>
       });
     }
 
-    // Check if user exists
-    const userExist = await pool.query('SELECT * FROM users WHERE email = $1', [email]);
-    if (userExist.rows.length > 0) {
-     return res.status(StatusCodes.CONFLICT).json({
-  success: false,
-  message: 'User already exists with this email',
-});
+ 
+    if (role && !VALID_ROLES.includes(role)) {
+      return res.status(StatusCodes.BAD_REQUEST).json({
+        success: false,
+        message: 'Role must be contributor or maintainer',
+      });
     }
 
-    // Hash password
-    const hashedPassword = await bcrypt.hash(password, 10);
-   const allowedRoles = ['contributor', 'maintainer'];
+   
+    const userExist = await pool.query('SELECT id FROM users WHERE email = $1', [email]);
+    if (userExist.rows.length > 0) {
+      return res.status(StatusCodes.CONFLICT).json({
+        success: false,
+        message: 'User already exists with this email',
+      });
+    }
 
-if (role && !allowedRoles.includes(role)) {
-  return res.status(StatusCodes.BAD_REQUEST).json({
-    success: false,
-    message: 'Invalid role',
-  });
-}
+    
+    const hashedPassword = await bcrypt.hash(password, 10);
+    const userRole: UserRole = role || 'contributor';
 
     const result = await pool.query(
       'INSERT INTO users (name, email, password, role) VALUES ($1, $2, $3, $4) RETURNING id, name, email, role, created_at, updated_at',
-      [name, email, hashedPassword, role]
+      [name, email, hashedPassword, userRole]
     );
 
     sendResponse(res, StatusCodes.CREATED, true, 'User registered successfully', result.rows[0]);
@@ -76,23 +81,18 @@ export const login = async (req: Request, res: Response, next: NextFunction) => 
       });
     }
 
-    // Sign Token with id, name, role
-    const tokenPayload = { 
-      id: Number(user.id), 
-      name: String(user.name), 
-      role: user.role as 'contributor' | 'maintainer' 
+    
+    const tokenPayload = {
+      id: Number(user.id),
+      name: String(user.name),
+      role: user.role as UserRole,
     };
 
-    const jwtSecret = process.env.JWT_SECRET || 'fallback_secret_key';
-    const jwtExpiresIn = process.env.JWT_EXPIRES_IN || '1d';
+    const jwtSecret: jwt.Secret = process.env.JWT_SECRET ?? 'fallback_secret_key';
+    const jwtExpiresIn: NonNullable<SignOptions['expiresIn']> =
+      (process.env.JWT_EXPIRES_IN ?? '1d') as NonNullable<SignOptions['expiresIn']>;
 
-    const token = jwt.sign(
-      tokenPayload, 
-      jwtSecret, 
-      {
-        expiresIn: jwtExpiresIn as any
-      }
-    );
+    const token = jwt.sign(tokenPayload, jwtSecret, { expiresIn: jwtExpiresIn });
 
     const userData = {
       id: user.id,
